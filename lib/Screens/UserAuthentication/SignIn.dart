@@ -1,5 +1,13 @@
+import 'package:baoim_official_app/Screens/Dashboard.dart';
+import 'package:baoim_official_app/Screens/UserAuthentication/ForgetPassword.dart';
 import 'package:flutter/material.dart';
 import 'package:baoim_official_app/Screens/ScreenSize.dart';
+import 'package:baoim_official_app/Firebase_auth_implementation/firebase_auth_services.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:fluttertoast/fluttertoast.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+
 
 class SignIn extends StatefulWidget {
   @override
@@ -7,19 +15,98 @@ class SignIn extends StatefulWidget {
 }
 
 class _RegisterPageState extends State<SignIn> {
+  // final FirebaseAuthServices _auth = FirebaseAuthServices();
+
   final _formKey = GlobalKey<FormState>();
-  String _emailOrPhone = '';
-  String _password = '';
+  TextEditingController _emailController = TextEditingController();
+  TextEditingController _passwordController = TextEditingController();
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
+  @override
+  void dispose(){
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
 
-  void _submitForm() {
-    if (_formKey.currentState?.validate() ?? false) {
-      _formKey.currentState?.save();
-      // Handle form submission logic (e.g., API call)
+  void _onLoginSuccess() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isLoggedIn', true);
 
-      print('Email or Phone: $_emailOrPhone');
-      print('Password: $_password');
+    // Navigate to the home page
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => Dashboard()),
+    );
+  }
+
+  void _signIn() async {
+    String email = _emailController.text.trim();
+    String password = _passwordController.text.trim();
+
+    if (_formKey.currentState!.validate()) {
+      try {
+        UserCredential userCredential = await _auth.signInWithEmailAndPassword(
+          email: email,
+          password: password,
+        );
+        if (userCredential.user != null) {
+          Fluttertoast.showToast(
+            msg: "Login successful!",
+            toastLength: Toast.LENGTH_SHORT,
+            gravity: ToastGravity.BOTTOM,
+            timeInSecForIosWeb: 1,
+            backgroundColor: Colors.grey,
+            textColor: Colors.white,
+            fontSize: 16.0,
+          );
+          _onLoginSuccess();
+        }
+      } on FirebaseAuthException catch (e) {
+        String errorMessage;
+        switch (e.code) {
+          case 'invalid-email':
+            errorMessage = "The email address is not valid.";
+            break;
+          case 'user-not-found':
+            errorMessage = "No user found for that email.";
+            break;
+          case 'wrong-password':
+            errorMessage = "Wrong password provided.";
+            break;
+          default:
+            errorMessage = e.message ?? "An error occurred";
+        }
+        Fluttertoast.showToast(
+          msg: errorMessage,
+          toastLength: Toast.LENGTH_SHORT,
+          gravity: ToastGravity.BOTTOM,
+          timeInSecForIosWeb: 1,
+          backgroundColor: Colors.grey,
+          textColor: Colors.white,
+          fontSize: 16.0,
+        );
+      } catch (e) {
+        // Handle any other types of exceptions
+        Fluttertoast.showToast(
+          msg: "An unexpected error occurred.",
+          toastLength: Toast.LENGTH_SHORT,
+          gravity: ToastGravity.BOTTOM,
+          timeInSecForIosWeb: 1,
+          backgroundColor: Colors.red,
+          textColor: Colors.white,
+          fontSize: 16.0,
+        );
+      }
     }
+  }
+
+
+  bool isValidEmail(String input) {
+    final RegExp emailRegex = RegExp(
+      r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}$",
+    );
+    return emailRegex.hasMatch(input);
   }
 
   @override
@@ -69,7 +156,8 @@ class _RegisterPageState extends State<SignIn> {
                           BorderRadius.circular(10), // Rounded corners
                         ),
                         child: TextFormField(
-                          decoration: InputDecoration(
+                          controller: _emailController,
+                          decoration: const InputDecoration(
                             hintText: "Email",
                             border: InputBorder.none, // Remove the border
                             enabledBorder:
@@ -89,9 +177,6 @@ class _RegisterPageState extends State<SignIn> {
                             }
                             return null;
                           },
-                          onSaved: (value) {
-                            _emailOrPhone = value ?? '';
-                          },
                         ),
                       ),
                       SizedBox(height: 10),
@@ -102,7 +187,8 @@ class _RegisterPageState extends State<SignIn> {
                           BorderRadius.circular(10), // Rounded corners
                         ),
                         child: TextFormField(
-                          decoration: InputDecoration(
+                          controller: _passwordController,
+                          decoration: const InputDecoration(
                             hintText: "Password",
                             border: InputBorder.none, // Remove the border
                             enabledBorder:
@@ -123,28 +209,70 @@ class _RegisterPageState extends State<SignIn> {
                             }
                             return null;
                           },
-                          onSaved: (value) {
-                            _password = value ?? '';
-                          },
                         ),
                       ),
 
+
+
+
+                      // FORGOT PASSWORD
+
+
+                      SizedBox(height: 10), // Add some space between the TextFormField and the clickable text
+                      Align(
+                        alignment: Alignment.centerRight, // Align text to the right
+                        child: GestureDetector(
+                          onTap: () {
+                            // Handle the "Forgot Password" click event here
+                            Navigator.pushReplacement(
+                                    context,
+                                    MaterialPageRoute(builder: (context) => ForgetPassword())
+                                );
+                            // You can navigate to a different page or show a dialog
+                          },
+                          child: Text(
+                            "Forgot Password?",
+                            style: TextStyle(
+                              color: Colors.grey, // Color for the text
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14// Bold text
+                               // Underline text
+                            ),
+                          ),
+                        ),
+                      ),
                       SizedBox(height: 20),
                       ElevatedButton(
-                        onPressed: _submitForm,
+                        onPressed: _signIn,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.orange,
-                          padding: EdgeInsets.symmetric(
-                              horizontal: 100, vertical: 15),
+                          fixedSize: Size(
+                            screenSizeHelper.blockSizeHorizontal * 80, // 80% of screen width
+                            screenSizeHelper.blockSizeVertical * 5, // 10% of screen height
+                          ),
+                          backgroundColor: Colors.transparent, // Set background to transparent
+                          shadowColor: Colors.transparent, // Remove shadow
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
                           ),
                         ),
-                        child: Text(
-                          'Create',
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: Colors.white,
+                        child: Container(
+                          alignment: Alignment.center, // Center the text
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(10),
+                            gradient: const LinearGradient(
+                              colors: <Color>[
+                                Color(0xFFFFC700),
+                                Color(0xFFFF0000),
+                              ],
+                            ),
+                          ),
+                          child: const Text(
+                            'Login',
+                            style: TextStyle(
+                              fontSize: 25,
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold, // Optional: Make the text bold
+                            ),
                           ),
                         ),
                       ),
@@ -194,11 +322,11 @@ class _RegisterPageState extends State<SignIn> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text('Already have an account?'),
+                          Text("Don't have an account?"),
                           TextButton(
                             onPressed: () {},
                             child: Text(
-                              'Sign in',
+                              'Register',
                               style: TextStyle(color: Colors.orange),
                             ),
                           ),
